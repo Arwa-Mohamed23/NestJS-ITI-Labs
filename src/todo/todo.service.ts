@@ -1,46 +1,45 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { Todo } from './todo.type';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Todo } from './schemas/todo.schema';
+import { CreateTodoDto } from './dto/create-todo.dto';
+import { UpdateTodoDto } from './dto/update-todo.dto';
 
 @Injectable()
 export class TodoService {
-  private todos: Todo[];
+  constructor(@InjectModel(Todo.name) private todoModel: Model<Todo>) {}
 
-  constructor() {
-    this.todos = [];
+  async getTodos(): Promise<Todo[]> {
+    return this.todoModel.find().exec();
   }
 
-  getTodos(): Todo[] {
-    return this.todos;
-  }
-
-  getTodo(id: number): Todo {
-    if (id < 0 || id >= this.todos.length) {
+  async getTodo(id: string): Promise<Todo> {
+    const todo = await this.todoModel.findById(id).exec();
+    if (!todo) {
       throw new NotFoundException('Todo not found');
     }
-    return this.todos[id];
+    return todo;
   }
 
-  addTodo(todo: Todo): string {
-    this.todos.push(todo);
-    return 'Todo added successfully!';
+  async addTodo(createTodoDto: CreateTodoDto): Promise<Todo> {
+    const createdTodo = new this.todoModel(createTodoDto);
+    return createdTodo.save();
   }
 
-  updateTodo(id: number, updateData: Partial<Todo>): string {
-    if (id < 0 || id >= this.todos.length) {
+  async updateTodo(id: string, updateTodoDto: UpdateTodoDto): Promise<Todo> {
+    const updatedTodo = await this.todoModel
+      .findByIdAndUpdate(id, updateTodoDto, { new: true })
+      .exec();
+    if (!updatedTodo) {
       throw new NotFoundException('Todo not found');
     }
-    this.todos[id] = { ...this.todos[id], ...updateData };
-    return 'Todo updated successfully!';
+    return updatedTodo;
   }
 
-  deleteTodo(id: number): string {
-    if (id < 0 || id >= this.todos.length) {
+  async deleteTodo(id: string): Promise<void> {
+    const result = await this.todoModel.deleteOne({ _id: id }).exec();
+    if (result.deletedCount === 0) {
       throw new NotFoundException('Todo not found');
     }
-    this.todos.splice(id, 1);
-    return 'Todo deleted successfully!';
   }
 }
